@@ -1,0 +1,11 @@
+{
+  "name": "crams",
+  "private": true,
+  "workspaces": ["client", "server"],
+  "scripts": {
+    "start": "concurrently \"npm:start --workspace client\" \"npm:start --workspace server\""
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
