@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { toast } from "react-toastify";
+import { API_URLS } from "../config/api";
 
 function AdminPanel() {
   const [courses, setCourses] = useState([]);
@@ -8,7 +9,7 @@ function AdminPanel() {
   const [analytics, setAnalytics] = useState(null);
 
   const fetchCourses = () => {
-    fetch("/api/courses", {
+    fetch(API_URLS.COURSES, {
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
     })
       .then(res => res.json())
@@ -17,7 +18,7 @@ function AdminPanel() {
 
   useEffect(() => {
     fetchCourses();
-    fetch("/api/analytics", {
+    fetch(API_URLS.ANALYTICS, {
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
     })
       .then(res => res.json())
@@ -29,7 +30,7 @@ function AdminPanel() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     const method = editing ? "PUT" : "POST";
-    const url = editing ? `/api/courses/${editing}` : "/api/courses";
+    const url = editing ? `${API_URLS.COURSES}/${editing}` : API_URLS.COURSES;
     const body = {
       ...form,
       limit: Number(form.limit),
@@ -60,7 +61,7 @@ function AdminPanel() {
   const handleEdit = c => setForm({ ...c, prerequisites: c.prerequisites.join(", "), times: c.times.map(t => `${t.day} ${t.start} ${t.end}`).join("; ") }) || setEditing(c._id);
   const handleDelete = async id => {
     if (!window.confirm("Delete this course?")) return;
-    const res = await fetch(`/api/courses/${id}`, {
+    const res = await fetch(`${API_URLS.COURSES}/${id}`, {
       method: "DELETE",
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
     });

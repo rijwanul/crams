@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { API_URLS } from "../config/api";
 
 function LoginPage() {
   const [email, setEmail] = useState("");
@@ -10,7 +11,7 @@ function LoginPage() {
     e.preventDefault();
     setError("");
     try {
-      const res = await fetch("/api/auth/login", {
+      const res = await fetch(API_URLS.LOGIN, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password, role }),

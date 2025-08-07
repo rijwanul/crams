@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { toast } from "react-toastify";
+import { API_URLS } from "../config/api";
 
 function checkConflicts(selected, courses) {
   // Simple time overlap check
@@ -28,7 +29,7 @@ function StudentDashboard() {
   const [statusLoaded, setStatusLoaded] = useState(false);
 
   useEffect(() => {
-    fetch("/api/courses", {
+    fetch(API_URLS.COURSES, {
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
     })
       .then(async res => {
@@ -45,7 +46,7 @@ function StudentDashboard() {
         if (Array.isArray(data)) setCourses(data);
         setCoursesLoaded(true);
       });
-    fetch("/api/registration/student", {
+    fetch(API_URLS.REGISTRATION_STUDENT, {
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
     })
       .then(async res => {
@@ -78,7 +79,7 @@ function StudentDashboard() {
       toast.error("Time conflict detected!");
       return;
     }
-    const res = await fetch("/api/registration", {
+    const res = await fetch(API_URLS.REGISTRATION, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -90,7 +91,7 @@ function StudentDashboard() {
       toast.success("Registration submitted!");
       setSelected([]); // Clear selections
       // Refresh registration status
-      fetch("/api/registration/student", {
+      fetch(API_URLS.REGISTRATION_STUDENT, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })
         .then(async res => {

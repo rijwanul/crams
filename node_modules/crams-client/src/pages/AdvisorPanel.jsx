@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { toast } from "react-toastify";
+import { API_URLS } from "../config/api";
 
 function AdvisorPanel() {
   const [plans, setPlans] = useState([]);
@@ -9,7 +10,7 @@ function AdvisorPanel() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    fetch("/api/registration", {
+    fetch(API_URLS.REGISTRATION, {
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
     })
       .then(async res => {
@@ -25,7 +26,7 @@ function AdvisorPanel() {
         if (Array.isArray(data)) setPlans(data);
         setLoading(false);
       });
-    fetch("/api/courses", {
+    fetch(API_URLS.COURSES, {
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
     })
       .then(res => res.json())
@@ -33,7 +34,7 @@ function AdvisorPanel() {
   }, []);
 
   const handleAction = async (id, action) => {
-    const res = await fetch(`/api/registration/${action}/${id}`, {
+    const res = await fetch(`${API_URLS.REGISTRATION}/${action}/${id}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -44,7 +45,7 @@ function AdvisorPanel() {
     if (res.ok) {
       toast.success(`${action === "approve" ? "Approved" : "Rejected"}!`);
       // Refresh the plans list
-      fetch("/api/registration", {
+      fetch(API_URLS.REGISTRATION, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })
         .then(res => res.json())
