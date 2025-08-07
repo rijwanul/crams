@@ -4,25 +4,65 @@ const User = require("../models/User");
 const auth = require("../middleware/auth");
 const router = express.Router();
 
+// Debug route to test if user routes are working
+router.get("/test", (req, res) => {
+  console.log("User routes test endpoint hit");
+  res.json({ message: "User routes are working!", timestamp: new Date().toISOString() });
+});
+
+// Debug route to list all users (for debugging only)
+router.get("/debug/list-all", async (req, res) => {
+  try {
+    console.log("Listing all users for debugging...");
+    const users = await User.find({}).select("-password");
+    console.log("Found users:", users.length);
+    res.json({ 
+      message: "All users retrieved", 
+      count: users.length,
+      users: users 
+    });
+  } catch (error) {
+    console.error("Error listing users:", error);
+    res.status(500).json({ error: "Failed to list users: " + error.message });
+  }
+});
+
 // Register new student
 router.post("/register-student", async (req, res) => {
+  console.log("Registration request received:", req.body);
+  console.log("Request headers:", req.headers);
+  console.log("Request URL:", req.url);
+  console.log("Request method:", req.method);
+  
   try {
     const { name, email, studentId, password } = req.body;
     
+    // Validate required fields
+    if (!name || !email || !studentId || !password) {
+      console.log("Missing required fields");
+      return res.status(400).json({ 
+        error: "All fields (name, email, studentId, password) are required" 
+      });
+    }
+    
+    console.log("Checking for existing user...");
     // Check if user already exists
     const existingUser = await User.findOne({ 
       $or: [{ email }, { studentId }] 
     });
     
     if (existingUser) {
+      console.log("User already exists:", existingUser.email);
       return res.status(400).json({ 
         error: "User with this email or student ID already exists" 
       });
     }
     
+    console.log("Hashing password...");
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
     
+    console.log("Creating new user...");
     // Create new student
     const user = new User({
       name,
@@ -32,7 +72,9 @@ router.post("/register-student", async (req, res) => {
       role: "Student"
     });
     
+    console.log("Saving user to database...");
     await user.save();
+    console.log("User saved successfully:", user._id);
     
     res.status(201).json({ 
       message: "Student registered successfully",
@@ -46,7 +88,8 @@ router.post("/register-student", async (req, res) => {
     });
   } catch (error) {
     console.error("Registration error:", error);
-    res.status(500).json({ error: "Failed to register student" });
+    console.error("Error stack:", error.stack);
+    res.status(500).json({ error: "Failed to register student: " + error.message });
   }
 });
 

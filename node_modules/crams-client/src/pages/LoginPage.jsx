@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { toast } from "react-toastify";
 import { API_URLS } from "../config/api";
 
@@ -14,6 +14,31 @@ function LoginPage() {
     studentId: "",
     password: ""
   });
+  const [serverStatus, setServerStatus] = useState("unknown");
+
+  // Test server connection on component mount
+  useEffect(() => {
+    testServerConnection();
+  }, []);
+
+  const testServerConnection = async () => {
+    try {
+      console.log("Testing server connection to:", API_URLS.LOGIN.replace('/api/auth/login', ''));
+      const response = await fetch(API_URLS.LOGIN.replace('/api/auth/login', ''), {
+        method: 'GET',
+      });
+      if (response.ok) {
+        setServerStatus("connected");
+        console.log("Server is running!");
+      } else {
+        setServerStatus("error");
+        console.log("Server responded with error:", response.status);
+      }
+    } catch (error) {
+      setServerStatus("disconnected");
+      console.error("Server connection failed:", error);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -49,8 +74,27 @@ function LoginPage() {
 
   const handleRegister = async (e) => {
     e.preventDefault();
+    
+    const registrationUrl = `${API_URLS.USERS}/register-student`;
+    console.log("Registration URL:", registrationUrl);
+    console.log("API_URLS.USERS:", API_URLS.USERS);
+    console.log("Registration data:", registrationForm);
+    
+    // First test if the server is reachable
     try {
-      const res = await fetch(`${API_URLS.USERS}/register-student`, {
+      console.log("Testing server connectivity...");
+      const testResponse = await fetch(API_URLS.USERS.replace('/api/users', ''), {
+        method: 'GET',
+      });
+      console.log("Server test response status:", testResponse.status);
+    } catch (testError) {
+      console.error("Server is not reachable:", testError);
+      toast.error("Cannot connect to server. Please check if the server is running.");
+      return;
+    }
+    
+    try {
+      const res = await fetch(registrationUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -58,16 +102,37 @@ function LoginPage() {
         body: JSON.stringify(registrationForm),
       });
 
+      console.log("Registration response status:", res.status);
+      console.log("Registration response headers:", Object.fromEntries(res.headers.entries()));
+      
       if (res.ok) {
+        const responseData = await res.json();
+        console.log("Registration success:", responseData);
         toast.success("Registration successful! You can now login.");
         setShowRegisterForm(false);
         setRegistrationForm({ name: "", email: "", studentId: "", password: "" });
       } else {
-        const errorData = await res.json();
+        const responseText = await res.text();
+        console.log("Registration error response (raw):", responseText);
+        
+        let errorData;
+        try {
+          errorData = JSON.parse(responseText);
+        } catch (e) {
+          errorData = { error: responseText || "Registration failed" };
+        }
+        
+        console.log("Registration error response (parsed):", errorData);
         toast.error(errorData.error || "Registration failed");
       }
     } catch (error) {
-      toast.error("Network error during registration");
+      console.error("Registration network error:", error);
+      console.error("Error details:", {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      });
+      toast.error(`Network error during registration: ${error.message}`);
     }
   };
 
@@ -86,6 +151,25 @@ function LoginPage() {
         
         <form className="bg-white py-8 px-6 shadow-xl rounded-xl space-y-6" onSubmit={handleSubmit}>
           <h3 className="text-xl font-semibold text-gray-800 text-center">Sign in to your account</h3>
+          
+          {/* Server Status Indicator */}
+          <div className="flex items-center justify-center space-x-2">
+            <div className={`w-3 h-3 rounded-full ${
+              serverStatus === "connected" ? "bg-green-500" : 
+              serverStatus === "disconnected" ? "bg-red-500" : "bg-yellow-500"
+            }`}></div>
+            <span className="text-sm text-gray-600">
+              Server: {serverStatus === "connected" ? "Connected" : 
+                      serverStatus === "disconnected" ? "Disconnected" : "Checking..."}
+            </span>
+            <button
+              type="button"
+              onClick={testServerConnection}
+              className="text-xs text-blue-600 hover:text-blue-800 underline"
+            >
+              Test
+            </button>
+          </div>
           
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
