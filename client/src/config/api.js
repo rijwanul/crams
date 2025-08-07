@@ -8,7 +8,9 @@ const API_CONFIG = {
     AUTH: '/api/auth',
     COURSES: '/api/courses',
     REGISTRATION: '/api/registration',
-    ANALYTICS: '/api/analytics'
+    ANALYTICS: '/api/analytics',
+    NOTIFICATIONS: '/api/notifications',
+    USERS: '/api/users'
   }
 };
 
@@ -24,7 +26,9 @@ export const API_URLS = {
   COURSES: getApiUrl(API_CONFIG.ENDPOINTS.COURSES),
   REGISTRATION: getApiUrl(API_CONFIG.ENDPOINTS.REGISTRATION),
   REGISTRATION_STUDENT: getApiUrl(API_CONFIG.ENDPOINTS.REGISTRATION + '/student'),
-  ANALYTICS: getApiUrl(API_CONFIG.ENDPOINTS.ANALYTICS)
+  ANALYTICS: getApiUrl(API_CONFIG.ENDPOINTS.ANALYTICS),
+  NOTIFICATIONS: getApiUrl(API_CONFIG.ENDPOINTS.NOTIFICATIONS),
+  USERS: getApiUrl(API_CONFIG.ENDPOINTS.USERS)
 };
 
 export default API_CONFIG;

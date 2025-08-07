@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { toast } from "react-toastify";
 import { API_URLS } from "../config/api";
 
 function LoginPage() {
@@ -6,25 +7,67 @@ function LoginPage() {
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("Student");
   const [error, setError] = useState("");
+  const [showRegisterForm, setShowRegisterForm] = useState(false);
+  const [registrationForm, setRegistrationForm] = useState({
+    name: "",
+    email: "",
+    studentId: "",
+    password: ""
+  });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    
+    console.log("Attempting login to:", API_URLS.LOGIN);
+    console.log("Login data:", { email, role });
+    
     try {
       const res = await fetch(API_URLS.LOGIN, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password, role }),
       });
+      
+      console.log("Login response status:", res.status);
+      
       const data = await res.json();
+      console.log("Login response data:", data);
+      
       if (res.ok) {
         localStorage.setItem("token", data.token);
+        toast.success("Login successful!");
         window.location.href = `/${data.role.toLowerCase()}`;
       } else {
         setError(data.error || "Login failed");
       }
     } catch (err) {
-      setError("Network error");
+      console.error("Login error:", err);
+      setError(`Network error: ${err.message}`);
+    }
+  };
+
+  const handleRegister = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await fetch(`${API_URLS.USERS}/register-student`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(registrationForm),
+      });
+
+      if (res.ok) {
+        toast.success("Registration successful! You can now login.");
+        setShowRegisterForm(false);
+        setRegistrationForm({ name: "", email: "", studentId: "", password: "" });
+      } else {
+        const errorData = await res.json();
+        toast.error(errorData.error || "Registration failed");
+      }
+    } catch (error) {
+      toast.error("Network error during registration");
     }
   };
 
@@ -105,12 +148,104 @@ function LoginPage() {
             Sign in
           </button>
           
-          <div className="text-center">
+          <div className="text-center space-y-3">
             <p className="text-xs text-gray-500">
               Demo credentials: student1@example.com / password123
             </p>
+            <button
+              type="button"
+              onClick={() => setShowRegisterForm(true)}
+              className="text-blue-600 hover:text-blue-800 text-sm font-medium transition duration-200"
+            >
+              Register as New Student
+            </button>
           </div>
         </form>
+        
+        {/* New Student Registration Modal */}
+        {showRegisterForm && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md mx-4">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold text-gray-900">Register New Student</h2>
+                <button
+                  onClick={() => setShowRegisterForm(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              
+              <form onSubmit={handleRegister} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={registrationForm.name}
+                    onChange={(e) => setRegistrationForm({...registrationForm, name: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Enter your full name"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                  <input
+                    type="email"
+                    required
+                    value={registrationForm.email}
+                    onChange={(e) => setRegistrationForm({...registrationForm, email: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Enter your email"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Student ID</label>
+                  <input
+                    type="text"
+                    required
+                    value={registrationForm.studentId}
+                    onChange={(e) => setRegistrationForm({...registrationForm, studentId: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Enter your student ID"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                  <input
+                    type="password"
+                    required
+                    value={registrationForm.password}
+                    onChange={(e) => setRegistrationForm({...registrationForm, password: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Create a password"
+                  />
+                </div>
+                
+                <div className="flex space-x-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowRegisterForm(false)}
+                    className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-700 py-2 px-4 rounded-lg transition duration-200"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition duration-200"
+                  >
+                    Register
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
