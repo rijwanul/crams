@@ -24,6 +24,8 @@ function StudentDashboard() {
   const [status, setStatus] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [coursesLoaded, setCoursesLoaded] = useState(false);
+  const [statusLoaded, setStatusLoaded] = useState(false);
 
   useEffect(() => {
     fetch("/api/courses", {
@@ -34,12 +36,14 @@ function StudentDashboard() {
           const err = await res.json().catch(() => ({}));
           setError(err.error || `Error: ${res.status}`);
           setCourses([]);
+          setCoursesLoaded(true);
           return;
         }
         return res.json();
       })
       .then(data => {
         if (Array.isArray(data)) setCourses(data);
+        setCoursesLoaded(true);
       });
     fetch("/api/registration/student", {
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
@@ -47,16 +51,23 @@ function StudentDashboard() {
       .then(async res => {
         if (!res.ok) {
           setStatus([]);
-          setLoading(false);
+          setStatusLoaded(true);
           return;
         }
         return res.json();
       })
       .then(data => {
         if (Array.isArray(data)) setStatus(data[0]?.courses || []);
-        setLoading(false);
+        setStatusLoaded(true);
       });
   }, []);
+
+  // Update loading state when both requests complete
+  useEffect(() => {
+    if (coursesLoaded && statusLoaded) {
+      setLoading(false);
+    }
+  }, [coursesLoaded, statusLoaded]);
 
   const handleSelect = (id) => {
     setSelected(selected.includes(id) ? selected.filter(cid => cid !== id) : [...selected, id]);
@@ -77,6 +88,21 @@ function StudentDashboard() {
     });
     if (res.ok) {
       toast.success("Registration submitted!");
+      setSelected([]); // Clear selections
+      // Refresh registration status
+      fetch("/api/registration/student", {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      })
+        .then(async res => {
+          if (!res.ok) {
+            setStatus([]);
+            return;
+          }
+          return res.json();
+        })
+        .then(data => {
+          if (Array.isArray(data)) setStatus(data[0]?.courses || []);
+        });
     } else {
       toast.error("Failed to submit registration");
     }
@@ -109,12 +135,28 @@ function StudentDashboard() {
       <h2 className="font-semibold mt-6 mb-2">Registration Status</h2>
       {loading ? <div>Loading...</div> : (
         <ul>
-          {status.map((c, i) => (
-            <li key={i} className="mb-1">
-              {courses.find(course => course._id === c.course)?.name || "(Unknown)"} - <span className="capitalize">{c.status}</span>
-              {c.feedback && <span className="ml-2 text-sm text-gray-500">({c.feedback})</span>}
-            </li>
-          ))}
+          {status.length > 0 ? status.map((c, i) => {
+            // Handle both populated course objects and course IDs
+            let courseName = "(Unknown)";
+            if (c.course) {
+              if (typeof c.course === 'object' && c.course.name) {
+                // Course is populated
+                courseName = `${c.course.code} - ${c.course.name}`;
+              } else if (typeof c.course === 'string') {
+                // Course is just an ID, find it in courses array
+                const course = courses.find(course => course._id === c.course);
+                if (course) {
+                  courseName = `${course.code} - ${course.name}`;
+                }
+              }
+            }
+            return (
+              <li key={i} className="mb-1">
+                {courseName} - <span className="capitalize">{c.status}</span>
+                {c.feedback && <span className="ml-2 text-sm text-gray-500">({c.feedback})</span>}
+              </li>
+            );
+          }) : <li>No registrations submitted yet.</li>}
         </ul>
       )}
     </div>

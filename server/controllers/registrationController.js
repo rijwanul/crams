@@ -13,8 +13,21 @@ exports.submitRegistration = async (req, res) => {
 };
 
 exports.getStudentRegistrations = async (req, res) => {
-  const regs = await Registration.find({ student: req.user.id }).populate("courses.course");
-  res.json(regs);
+  try {
+    const regs = await Registration.find({ student: req.user.id }).populate("courses.course");
+    res.json(regs);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+exports.getAllRegistrations = async (req, res) => {
+  try {
+    const regs = await Registration.find().populate("student", "email").populate("courses.course");
+    res.json(regs);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 };
 
 exports.approveRegistration = async (req, res) => {
