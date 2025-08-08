@@ -1,9 +1,19 @@
 {
   "name": "crams",
+  "version": "1.0.0",
   "private": true,
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
   "workspaces": ["client", "server"],
   "scripts": {
-    "start": "concurrently \"npm:start --workspace client\" \"npm:start --workspace server\""
+    "start": "npm run start --workspace server",
+    "dev": "concurrently \"npm:start --workspace client\" \"npm:start --workspace server\"",
+    "build": "npm run build --workspace client",
+    "install:server": "npm install --workspace server",
+    "install:client": "npm install --workspace client",
+    "install:all": "npm install && npm run install:server && npm run install:client"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

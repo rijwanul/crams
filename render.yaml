@@ -1,0 +1,36 @@
+services:
+  # Backend API
+  - type: web
+    name: crams-api
+    env: node
+    buildCommand: npm run install:server
+    startCommand: npm start --workspace server
+    rootDir: .
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_URI
+        fromDatabase:
+          name: crams-mongodb
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: PORT
+        value: 10000
+
+  # Frontend (Static Site)
+  - type: static
+    name: crams-frontend
+    env: node
+    buildCommand: npm run install:client && npm run build --workspace client
+    staticPublishPath: ./client/build
+    rootDir: .
+    envVars:
+      - key: REACT_APP_API_URL
+        value: https://crams-api.onrender.com
+
+# Database
+databases:
+  - name: crams-mongodb
+    databaseName: crams
+    user: crams_user
