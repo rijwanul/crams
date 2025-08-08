@@ -93,44 +93,26 @@ router.post("/register-student", async (req, res) => {
   }
 });
 
-// Get all students (for admin/advisor)
-router.get("/students", auth, async (req, res) => {
-  try {
-    if (req.user.role !== "Admin" && req.user.role !== "Advisor") {
-      return res.status(403).json({ error: "Access denied" });
-    }
-    
-    const students = await User.find({ role: "Student" })
-      .select("-password")
-      .sort({ name: 1 });
-    
-    res.json(students);
-  } catch (error) {
-    console.error("Get students error:", error);
-    res.status(500).json({ error: "Failed to fetch students" });
-  }
-});
-
-// Get all advisors (for admin)
-router.get("/advisors", auth, async (req, res) => {
+// Get all users (admin only)
+router.get("/", auth, async (req, res) => {
   try {
     if (req.user.role !== "Admin") {
       return res.status(403).json({ error: "Access denied" });
     }
     
-    const advisors = await User.find({ role: "Advisor" })
+    const users = await User.find({})
       .select("-password")
-      .sort({ name: 1 });
+      .sort({ role: 1, name: 1 });
     
-    res.json(advisors);
+    res.json(users);
   } catch (error) {
-    console.error("Get advisors error:", error);
-    res.status(500).json({ error: "Failed to fetch advisors" });
+    console.error("Get users error:", error);
+    res.status(500).json({ error: "Failed to fetch users" });
   }
 });
 
 // Create new user (admin only)
-router.post("/create", auth, async (req, res) => {
+router.post("/", auth, async (req, res) => {
   try {
     if (req.user.role !== "Admin") {
       return res.status(403).json({ error: "Access denied" });
@@ -175,6 +157,104 @@ router.post("/create", auth, async (req, res) => {
   } catch (error) {
     console.error("Create user error:", error);
     res.status(500).json({ error: "Failed to create user" });
+  }
+});
+
+// Update user (admin only)
+router.put("/:id", auth, async (req, res) => {
+  try {
+    if (req.user.role !== "Admin") {
+      return res.status(403).json({ error: "Access denied" });
+    }
+    
+    const { name, email, role, studentId } = req.body;
+    const updateData = { name, email, role };
+    
+    // Add studentId only for students
+    if (role === "Student" && studentId) {
+      updateData.studentId = studentId;
+    }
+    
+    const user = await User.findByIdAndUpdate(
+      req.params.id, 
+      updateData, 
+      { new: true }
+    ).select("-password");
+    
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    
+    res.json({ 
+      message: "User updated successfully",
+      user
+    });
+  } catch (error) {
+    console.error("Update user error:", error);
+    res.status(500).json({ error: "Failed to update user" });
+  }
+});
+
+// Reset user password (admin only)
+router.post("/:id/reset-password", auth, async (req, res) => {
+  try {
+    if (req.user.role !== "Admin") {
+      return res.status(403).json({ error: "Access denied" });
+    }
+    
+    const { newPassword } = req.body;
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    
+    const user = await User.findByIdAndUpdate(
+      req.params.id, 
+      { password: hashedPassword },
+      { new: true }
+    ).select("-password");
+    
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    
+    res.json({ message: "Password reset successfully" });
+  } catch (error) {
+    console.error("Reset password error:", error);
+    res.status(500).json({ error: "Failed to reset password" });
+  }
+});
+
+// Get all students (for admin/advisor)
+router.get("/students", auth, async (req, res) => {
+  try {
+    if (req.user.role !== "Admin" && req.user.role !== "Advisor") {
+      return res.status(403).json({ error: "Access denied" });
+    }
+    
+    const students = await User.find({ role: "Student" })
+      .select("-password")
+      .sort({ name: 1 });
+    
+    res.json(students);
+  } catch (error) {
+    console.error("Get students error:", error);
+    res.status(500).json({ error: "Failed to fetch students" });
+  }
+});
+
+// Get all advisors (for admin)
+router.get("/advisors", auth, async (req, res) => {
+  try {
+    if (req.user.role !== "Admin") {
+      return res.status(403).json({ error: "Access denied" });
+    }
+    
+    const advisors = await User.find({ role: "Advisor" })
+      .select("-password")
+      .sort({ name: 1 });
+    
+    res.json(advisors);
+  } catch (error) {
+    console.error("Get advisors error:", error);
+    res.status(500).json({ error: "Failed to fetch advisors" });
   }
 });
 
