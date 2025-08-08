@@ -11,11 +11,40 @@ function AdvisorPanel() {
   const [selectedCourses, setSelectedCourses] = useState({});
   const [showScreenedRegistrations, setShowScreenedRegistrations] = useState(false);
   const [error, setError] = useState("");
+  const [analytics, setAnalytics] = useState(null);
+  const [showNotificationModal, setShowNotificationModal] = useState(false);
+  const [notificationForm, setNotificationForm] = useState({ title: "", message: "", recipients: [] });
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
 
   useEffect(() => {
     fetchRegistrations();
     fetchCourses();
+    fetchAnalytics();
   }, []);
+
+  const fetchAnalytics = async () => {
+    try {
+      console.log("🔍 Fetching analytics from:", API_URLS.ANALYTICS);
+      const response = await fetch(API_URLS.ANALYTICS, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log("📊 Analytics data received:", data);
+        setAnalytics(data);
+      } else {
+        console.warn("⚠️ Analytics fetch failed:", response.status, response.statusText);
+        // Don't set analytics data, but don't crash the component
+        setAnalytics(null);
+      }
+    } catch (error) {
+      console.error("❌ Error fetching analytics:", error);
+      // Don't crash the component if analytics fail
+      setAnalytics(null);
+    }
+  };
 
   const fetchRegistrations = async () => {
     try {
@@ -60,10 +89,72 @@ function AdvisorPanel() {
     return registration.courses.every(course => course.status !== 'pending');
   };
 
-  // Filter registrations based on screening status
-  const filteredRegistrations = registrations.filter(reg => 
-    showScreenedRegistrations ? isScreened(reg) : !isScreened(reg)
-  );
+  const getStatusColor = (status) => {
+    switch (status) {
+      case "approved": return "bg-green-100 text-green-800 border-green-200";
+      case "rejected": return "bg-red-100 text-red-800 border-red-200";
+      case "waitlisted": return "bg-blue-100 text-blue-800 border-blue-200";
+      default: return "bg-yellow-100 text-yellow-800 border-yellow-200";
+    }
+  };
+
+  const getOverallStatus = (courses) => {
+    const statuses = courses.map(c => c.status);
+    if (statuses.every(s => s === "approved")) return "All Approved";
+    if (statuses.every(s => s === "rejected")) return "All Rejected";
+    if (statuses.includes("approved") && statuses.includes("rejected")) return "Mixed";
+    if (statuses.includes("pending")) return "Pending Review";
+    return "Under Review";
+  };
+
+  // Filter registrations based on search and status
+  const getFilteredRegistrations = () => {
+    try {
+      if (!registrations || !Array.isArray(registrations)) {
+        return [];
+      }
+
+      let filtered = registrations.filter(reg => 
+        showScreenedRegistrations ? isScreened(reg) : !isScreened(reg)
+      );
+
+      // Apply search filter
+      if (searchTerm && searchTerm.trim()) {
+        filtered = filtered.filter(reg => {
+          const searchLower = searchTerm.toLowerCase();
+          return (
+            reg.student?.email?.toLowerCase().includes(searchLower) ||
+            reg.student?.name?.toLowerCase().includes(searchLower) ||
+            reg.courses?.some(c => 
+              c.course?.name?.toLowerCase().includes(searchLower) ||
+              c.course?.code?.toLowerCase().includes(searchLower)
+            )
+          );
+        });
+      }
+
+      // Apply status filter
+      if (statusFilter !== "all") {
+        filtered = filtered.filter(reg => {
+          try {
+            const overallStatus = getOverallStatus(reg.courses || []);
+            return overallStatus.toLowerCase().includes(statusFilter.toLowerCase());
+          } catch (error) {
+            console.warn("Error filtering by status:", error);
+            return true; // Include the registration if status check fails
+          }
+        });
+      }
+
+      return filtered;
+    } catch (error) {
+      console.error("Error in getFilteredRegistrations:", error);
+      return registrations || []; // Return unfiltered data as fallback
+    }
+  };
+
+  // Filter registrations based on screening status, search, and status filter
+  const filteredRegistrations = getFilteredRegistrations();
 
   // Handle individual course action
   const handleCourseAction = async (registrationId, courseId, action) => {
@@ -230,22 +321,38 @@ function AdvisorPanel() {
     }
   };
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case "approved": return "bg-green-100 text-green-800 border-green-200";
-      case "rejected": return "bg-red-100 text-red-800 border-red-200";
-      case "waitlisted": return "bg-blue-100 text-blue-800 border-blue-200";
-      default: return "bg-yellow-100 text-yellow-800 border-yellow-200";
-    }
-  };
+  // Handle bulk notification sending
+  const handleBulkNotification = async () => {
+    try {
+      console.log("📧 Sending notification:", notificationForm);
+      console.log("📧 API URL:", `${API_URLS.NOTIFICATIONS}/send`);
+      
+      const response = await fetch(`${API_URLS.NOTIFICATIONS}/send`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: JSON.stringify(notificationForm),
+      });
 
-  const getOverallStatus = (courses) => {
-    const statuses = courses.map(c => c.status);
-    if (statuses.every(s => s === "approved")) return "All Approved";
-    if (statuses.every(s => s === "rejected")) return "All Rejected";
-    if (statuses.includes("approved") && statuses.includes("rejected")) return "Mixed";
-    if (statuses.includes("pending")) return "Pending Review";
-    return "Under Review";
+      console.log("📧 Response status:", response.status);
+      
+      if (response.ok) {
+        const result = await response.json();
+        console.log("📧 Success response:", result);
+        toast.success(`Notification sent to ${notificationForm.recipients.length} student(s)!`);
+        setShowNotificationModal(false);
+        setNotificationForm({ title: "", message: "", recipients: [] });
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        console.error("📧 Error response:", response.status, errorData);
+        toast.error(`Failed to send notification: ${errorData.error || response.status}`);
+      }
+    } catch (error) {
+      console.error("📧 Network error sending notification:", error);
+      toast.error(`Error sending notification: ${error.message}`);
+    }
   };
 
   if (loading) {
@@ -320,6 +427,89 @@ function AdvisorPanel() {
           </div>
           
           <div className="p-6">
+            {/* Analytics Dashboard */}
+            <div className="analytics-section mb-6">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                📊 Registration Analytics
+              </h3>
+              {analytics ? (
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <h4 className="text-sm font-medium text-blue-800">Total Registrations</h4>
+                    <p className="text-2xl font-bold text-blue-900">{analytics.totalRegistrations}</p>
+                  </div>
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <h4 className="text-sm font-medium text-yellow-800">Pending Review</h4>
+                    <p className="text-2xl font-bold text-yellow-900">{analytics.pendingRegistrations}</p>
+                  </div>
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <h4 className="text-sm font-medium text-green-800">Approved Courses</h4>
+                    <p className="text-2xl font-bold text-green-900">{analytics.approvedCourses}</p>
+                  </div>
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <h4 className="text-sm font-medium text-red-800">Rejected Courses</h4>
+                    <p className="text-2xl font-bold text-red-900">{analytics.rejectedCourses}</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
+                  <p className="text-gray-600 text-sm">Analytics temporarily unavailable</p>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-2">
+                    <div className="bg-gray-100 rounded-lg p-4">
+                      <h4 className="text-sm font-medium text-gray-600">Total Registrations</h4>
+                      <p className="text-xl font-bold text-gray-500">--</p>
+                    </div>
+                    <div className="bg-gray-100 rounded-lg p-4">
+                      <h4 className="text-sm font-medium text-gray-600">Pending Review</h4>
+                      <p className="text-xl font-bold text-gray-500">--</p>
+                    </div>
+                    <div className="bg-gray-100 rounded-lg p-4">
+                      <h4 className="text-sm font-medium text-gray-600">Approved Courses</h4>
+                      <p className="text-xl font-bold text-gray-500">--</p>
+                    </div>
+                    <div className="bg-gray-100 rounded-lg p-4">
+                      <h4 className="text-sm font-medium text-gray-600">Rejected Courses</h4>
+                      <p className="text-xl font-bold text-gray-500">--</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Search and Filter Controls */}
+            <div className="controls-section mb-6">
+              <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
+                <div className="flex flex-col sm:flex-row gap-4 flex-1">
+                  <input
+                    type="text"
+                    placeholder="Search by student name, email, or course..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent flex-1"
+                  />
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  >
+                    <option value="all">All Statuses</option>
+                    <option value="pending">Pending</option>
+                    <option value="approved">Approved</option>
+                    <option value="rejected">Rejected</option>
+                    <option value="mixed">Mixed</option>
+                  </select>
+                </div>
+                
+                {/* Bulk Notification Button */}
+                <button
+                  onClick={() => setShowNotificationModal(true)}
+                  className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-4 py-2 rounded-lg transition duration-200 flex items-center"
+                >
+                  📢 Send Bulk Notification
+                </button>
+              </div>
+            </div>
+
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm mb-6">
                 {error}
@@ -556,6 +746,104 @@ function AdvisorPanel() {
           </div>
         </div>
       </div>
+
+      {/* Bulk Notification Modal */}
+      {showNotificationModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Send Bulk Notification</h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Title
+                </label>
+                <input
+                  type="text"
+                  value={notificationForm.title}
+                  onChange={(e) => setNotificationForm(prev => ({ ...prev, title: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  placeholder="Notification title..."
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Message
+                </label>
+                <textarea
+                  value={notificationForm.message}
+                  onChange={(e) => setNotificationForm(prev => ({ ...prev, message: e.target.value }))}
+                  rows={4}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  placeholder="Type your message here..."
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Recipients
+                </label>
+                <div className="space-y-2 max-h-32 overflow-y-auto border border-gray-300 rounded-lg p-2">
+                  {filteredRegistrations.map((reg) => {
+                    console.log("📋 Registration for notification:", reg);
+                    const studentId = reg.student?._id || reg.student || reg.userId;
+                    const studentName = reg.student?.name || reg.student?.email || "Student";
+                    
+                    return (
+                      <label key={reg._id} className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          checked={notificationForm.recipients.includes(studentId)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setNotificationForm(prev => ({
+                                ...prev,
+                                recipients: [...prev.recipients, studentId]
+                              }));
+                            } else {
+                              setNotificationForm(prev => ({
+                                ...prev,
+                                recipients: prev.recipients.filter(id => id !== studentId)
+                              }));
+                            }
+                          }}
+                          className="rounded border-gray-300"
+                        />
+                        <span className="text-sm text-gray-700">
+                          {studentName} {studentId ? `(${studentId})` : "(No ID)"}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  {notificationForm.recipients.length} student(s) selected
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex justify-end space-x-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowNotificationModal(false);
+                  setNotificationForm({ title: "", message: "", recipients: [] });
+                }}
+                className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition duration-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBulkNotification}
+                disabled={!notificationForm.title || !notificationForm.message || notificationForm.recipients.length === 0}
+                className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Send Notification
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

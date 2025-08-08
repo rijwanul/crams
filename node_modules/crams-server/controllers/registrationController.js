@@ -68,9 +68,11 @@ exports.getStudentRegistrations = async (req, res) => {
 
 exports.getAllRegistrations = async (req, res) => {
   try {
-    const regs = await Registration.find().populate("student", "email").populate("courses.course");
+    const regs = await Registration.find().populate("student", "_id email name").populate("courses.course");
+    console.log("📋 Fetched registrations with populated student data");
     res.json(regs);
   } catch (err) {
+    console.error("❌ Error fetching registrations:", err);
     res.status(500).json({ error: err.message });
   }
 };
